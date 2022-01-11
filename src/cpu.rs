@@ -243,12 +243,16 @@ impl CPU {
                     let pixel = self.memory[(self.I + y_line) as usize] as u16;
 
                     for x_line in 0..8 {
+                        let x_pos = (x + x_line) % 64;
+                        let y_pos = (y + y_line) % 32;
+
+                        let pixel_pos = x_pos + (y_pos * 64);
+
                         if (pixel & (0x80 >> x_line)) != 0 {
-                            let gfx_index = (x + x_line + ((y + y_line) * 64)) as usize;
-                            if self.gfx[gfx_index] == 1 {
+                            if self.gfx[pixel_pos as usize] == 1 {
                                 self.V[0xf] = 1;
                             }
-                            self.gfx[gfx_index] ^= 1;
+                            self.gfx[pixel_pos as usize] ^= 1;
                         }
                     }
                 }

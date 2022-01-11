@@ -10,4 +10,4 @@ TODO:
 - [ ] Configurable keypad
 - [ ] Configurable colors
 - [ ] Improve input handling
-- [ ] Fix an issue with `index out of bounds` while rendering (might be related to the way adding is handled)
+- [x] Fix wrapping
