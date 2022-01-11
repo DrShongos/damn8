@@ -4,7 +4,7 @@ mod cpu;
 
 use cpu::CPU;
 
-const PIXEL_SIZE: u16 = 10;
+const PIXEL_SIZE: f32 = 10.0;
 
 fn window_conf() -> Conf {
     Conf {
@@ -17,7 +17,7 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut cpu = CPU::new("./Breakout [Carmelo Cortez, 1979].ch8");
+    let mut cpu = CPU::new("./test_opcode.ch8");
 
     clear_background(BLACK);
 
@@ -37,8 +37,8 @@ fn draw_screen(cpu: &CPU) {
 
     for y in 0..32 {
         for x in 0..64 {
-            if cpu.gfx[(x * y) as usize] != 0 {
-                draw_rectangle((x * PIXEL_SIZE) as f32, (y * PIXEL_SIZE) as f32, PIXEL_SIZE as f32, PIXEL_SIZE as f32, WHITE);
+            if cpu.gfx[(y * 64 + x) as usize] != 0 {
+                draw_rectangle(x as f32 * PIXEL_SIZE, y as f32 * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE, WHITE);
             }
         }
     }
