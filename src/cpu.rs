@@ -1,4 +1,5 @@
 use std::fs;
+use rand::{thread_rng, prelude::ThreadRng, Rng};
 
 const FONTSET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -16,7 +17,7 @@ const FONTSET: [u8; 80] = [
     0xF0, 0x80, 0x80, 0x80, 0xF0, // C
     0xE0, 0x90, 0x90, 0x90, 0xE0, // D
     0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+    0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
 // (Almost) every CHIP-8 program starts on 0x200 memory address.
@@ -25,7 +26,9 @@ const PROGRAM_START: u16 = 0x200;
 pub struct CPU {
     opcode: u16,
     memory: [u8; 4096],
-    
+
+    rng: ThreadRng,
+
     // CHIP-8's registers. Even though there are 16 of them, only 0-E can be used by a program.
     V: [u8; 16],
 
@@ -39,11 +42,13 @@ pub struct CPU {
     sound_timer: u8,
 
     stack: [u16; 16],
-    sp: u16, 
+    sp: u16,
 
-    keypad: [u8; 16],
+    pub keypad: [u8; 16],
 
     pub draw_flag: bool,
+    pub input_flag: bool,
+    pub last_key: u8,
 }
 
 impl CPU {
@@ -63,10 +68,11 @@ impl CPU {
         for i in 0..rom_data.len() {
             memory[i + PROGRAM_START as usize] = rom_data[i];
         }
-        
+
         CPU {
             opcode: 0,
             memory: memory,
+            rng: thread_rng(),
             V: [0; 16],
             I: 0,
             pc: PROGRAM_START,
@@ -77,23 +83,32 @@ impl CPU {
             sp: 0,
             keypad: [0; 16],
             draw_flag: false,
+            input_flag: false,
+            last_key: 0,
         }
     }
 
     pub fn cycle(&mut self) {
-        self.opcode = ((self.memory[self.pc as usize] as u16) << 8u16 | self.memory[self.pc as usize + 1] as u16) as u16;
-        //println!("Current opcode: {:#x}", self.opcode);
+        self.opcode = ((self.memory[self.pc as usize] as u16) << 8u16
+            | self.memory[self.pc as usize + 1] as u16) as u16;
+
+        //println!("OPCODE: {:#X}", self.opcode);
         // TODO: Consider using funcion pointers instead.
         let v_x = (self.opcode & 0x0F00) as usize >> 8;
         let v_y = (self.opcode & 0x00F0) as usize >> 4;
+
+        let nnn = self.opcode & 0x0FFF;
+        let nn = self.opcode & 0x00FF;
+        let n = self.opcode & 0x000F;
+
         match self.opcode & 0xF000 {
-            0x0000 => match self.opcode & 0x000F {
+            0x0000 => match n {
                 0x0000 => {
                     self.gfx = [0; 2048];
 
                     self.draw_flag = true;
                     self.pc += 2;
-                },
+                }
                 0x000E => {
                     self.stack[self.sp as usize] = 0;
                     self.sp -= 1;
@@ -103,72 +118,72 @@ impl CPU {
                 _ => {
                     println!("Unknown opcode detected: {:#x}. Ignoring.", self.opcode);
                 }
-            }
+            },
             0x1000 => {
-                self.pc = self.opcode & 0x0FFF;
+                self.pc = nnn;
             }
             0x2000 => {
                 self.stack[self.sp as usize] = self.pc;
                 self.sp += 1;
-                self.pc = self.opcode & 0x0FFF;
+                self.pc = nnn;
             }
             0x3000 => {
-                if self.V[v_x]== (self.opcode & 0x00FF) as u8 {
+                if self.V[v_x] == (nn) as u8 {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
                 };
             }
             0x4000 => {
-                if self.V[v_x]!= (self.opcode & 0x00FF) as u8 {
+                if self.V[v_x] != (nn) as u8 {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
                 };
             }
             0x5000 => {
-                if self.V[v_x]== self.V[v_y]{
+                if self.V[v_x] == self.V[v_y] {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
                 };
             }
             0x6000 => {
-                self.V[v_x]= (self.opcode & 0x00FF) as u8;
+                self.V[v_x] = (nn) as u8;
                 self.pc += 2;
             }
             0x7000 => {
-                self.V[v_x]= self.V[(self.opcode & 0x0F00) as usize >> 8].wrapping_add((self.opcode & 0x00FF) as u8);
+                self.V[v_x] = self.V[v_x].wrapping_add((nn) as u8);
                 self.pc += 2;
             }
-            0x8000 => match self.opcode & 0x000F {
+            0x8000 => match n {
                 0x0000 => {
-                    self.V[v_x]= self.V[v_y];
+                    self.V[v_x] = self.V[v_y];
                     self.pc += 2;
                 }
                 0x0001 => {
-                    self.V[v_x]|= self.V[v_y];
+                    self.V[v_x] |= self.V[v_y];
                     self.pc += 2;
                 }
                 0x0002 => {
-                    self.V[v_x]&= self.V[v_y];
+                    self.V[v_x] &= self.V[v_y];
                     self.pc += 2;
                 }
                 0x0003 => {
-                    self.V[v_x]^= self.V[v_y];
+                    self.V[v_x] ^= self.V[v_y];
                     self.pc += 2;
                 }
                 0x0004 => {
-                    if self.V[v_y]> (0xFF - self.V[v_x]) {
+                    if self.V[v_y] > (0xFF - self.V[v_x]) {
                         self.V[0xF] = 1;
                     } else {
                         self.V[0xF] = 0;
                     }
-                    self.V[v_x]= self.V[v_x].wrapping_add(self.V[v_y]);
+                    self.V[v_x] = self.V[v_x].wrapping_add(self.V[v_y]);
                     self.pc += 2;
                 }
                 0x0005 => {
-                    if self.V[v_y]> self.V[v_x]{
+                    if self.V[v_y] > self.V[v_x] {
                         self.V[0xF] = 0;
                     } else {
                         self.V[0xF] = 1;
@@ -177,57 +192,63 @@ impl CPU {
                     self.pc += 2;
                 }
                 0x0006 => {
-                    self.V[0xF] = self.V[v_x]& 0x1;
-                    self.V[v_x]>>= 1;
+                    self.V[0xF] = self.V[v_x] & 0x1;
+                    self.V[v_x] >>= 1;
                     self.pc += 2;
                 }
                 0x0007 => {
-                    if self.V[v_y]> (0xFF - self.V[(self.opcode & 0x0F00) as usize]) {
+                    if self.V[v_y] > (0xFF - self.V[(self.opcode & 0x0F00) as usize]) {
                         self.V[0xF] = 1;
                     } else {
                         self.V[0xF] = 0;
                     }
-                    self.V[v_x]= self.V[v_y]- self.V[v_x];
+                    self.V[v_x] = self.V[v_y] - self.V[v_x];
                     self.pc += 2;
                 }
                 0x000E => {
-                    self.V[0xF] = self.V[v_x]& 7;
-                    self.V[v_x]<<= 1;
+                    self.V[0xF] = self.V[v_x] & 7;
+                    self.V[v_x] <<= 1;
                     self.pc += 2;
                 }
                 _ => {
                     println!("Unknown opcode detected: {:#x}. Ignoring.", self.opcode);
                 }
-            }
+            },
             0x9000 => {
-                if self.V[v_x]!= self.V[v_y]{
+                if self.V[v_x] != self.V[v_y] {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
                 };
             }
             0xA000 => {
-                self.I = self.opcode & 0x0FFF;
+                self.I = nnn;
                 self.pc += 2;
             }
             0xB000 => {
-                self.pc = (self.opcode & 0x0FFF) + self.V[0] as u16;
+                self.pc = (nnn) + self.V[0] as u16;
+            }
+            0xC000 => {
+                let number: u8 = self.rng.gen();
+                self.V[v_x] = number & nn as u8;
+                self.pc += 2;
             }
             0xD000 => {
-                let x = self.V[v_x]as u16;
-                let y = self.V[v_y]as u16;
-                let height = self.opcode & 0x000F;
+                let x = self.V[v_x] as u16;
+                let y = self.V[v_y] as u16;
+                let height = n;
 
                 self.V[0xf] = 0;
                 for y_line in 0..height {
                     let pixel = self.memory[(self.I + y_line) as usize] as u16;
-                    
+
                     for x_line in 0..8 {
                         if (pixel & (0x80 >> x_line)) != 0 {
-                            if self.gfx[(x + x_line + ((y + y_line) * 64)) as usize] == 1{
+                            let gfx_index = (x + x_line + ((y + y_line) * 64)) as usize;
+                            if self.gfx[gfx_index] == 1 {
                                 self.V[0xf] = 1;
                             }
-                            self.gfx[(x + x_line + ((y + y_line) * 64)) as usize] ^= 1;
+                            self.gfx[gfx_index] ^= 1;
                         }
                     }
                 }
@@ -235,39 +256,75 @@ impl CPU {
                 self.draw_flag = true;
                 self.pc += 2;
             }
-            0xF000 => match self.opcode & 0x00FF {
+            0xE000 => match nn {
+                0x009E => {
+                    if self.keypad[self.V[v_x] as usize] != 0 {
+                        self.pc += 4;
+                    } else {
+                        self.pc += 2;
+                    }
+                }
+                0x00A1 => {
+                    if self.keypad[self.V[v_x] as usize] == 0 {
+                        self.pc += 4;
+                    } else {
+                        self.pc += 2;
+                    }
+                }
+                _ => {
+                    println!("Unknown opcode detected: {:#x}. Ignoring", self.opcode);
+                }
+            }
+            0xF000 => match nn {
                 0x0007 => {
-                    self.V[v_x]= self.delay_timer;
+                    self.V[v_x] = self.delay_timer;
+                    self.pc += 2;
+                }
+                0x000A => {
+                    if !self.input_flag {
+                        return;
+                    }
+
+                    //println!("KEY PRESSED: {:#x}", self.last_key);
+                    self.V[v_x] = self.last_key;
+                    self.pc += 2;   
+                }
+                0x0015 => {
+                    self.delay_timer = self.V[v_x];
+                    self.pc += 2;
+                }
+                0x0018 => {
+                    self.sound_timer = self.V[v_x];
                     self.pc += 2;
                 }
                 0x0029 => {
-                    self.I = self.V[v_x]as u16 * 0x5;
+                    self.I = self.V[v_x] as u16 * 0x5;
                     self.pc += 2;
                 }
                 0x0033 => {
-                    self.memory[self.I as usize] = self.V[v_x]/ 100;
-                    self.memory[self.I as usize+1] = (self.V[v_x]/ 10) % 10;
-                    self.memory[self.I as usize+2] = (self.V[v_x]% 100) % 10;
+                    self.memory[self.I as usize] = self.V[v_x] / 100;
+                    self.memory[self.I as usize + 1] = (self.V[v_x] / 10) % 10;
+                    self.memory[self.I as usize + 2] = (self.V[v_x] % 100) % 10;
                     self.pc += 2;
                 }
                 0x0055 => {
-                    for offset in 0..v_x + 1{
+                    for offset in 0..v_x + 1 {
                         self.memory[self.I as usize + offset] = self.V[offset];
                     }
-                    //self.I += ((self.opcode & 0x0F00) >> 8) + 1;
+                    self.I += ((self.opcode & 0x0F00) >> 8) + 1;
                     self.pc += 2;
                 }
                 0x0065 => {
                     for offset in 0..v_x + 1 {
                         self.V[offset] = self.memory[self.I as usize + offset];
                     }
-                    //self.I += ((self.opcode & 0x0F00) >> 8) + 1;
+                    self.I += ((self.opcode & 0x0F00) >> 8) + 1;
                     self.pc += 2;
                 }
                 _ => {
                     println!("Unknown opcode detected: {:#x}. Ignoring", self.opcode);
                 }
-            } 
+            },
             _ => {
                 println!("Unknown opcode detected: {:#x}. Ignoring.", self.opcode);
             }
