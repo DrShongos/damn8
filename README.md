@@ -9,5 +9,5 @@ TODO:
 - [ ] Add sound
 - [ ] Configurable keypad
 - [ ] Configurable colors
-- [ ] Improve input handling
+- [x] Improve input handling
 - [x] Fix wrapping

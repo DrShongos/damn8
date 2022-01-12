@@ -38,7 +38,7 @@ const KEYMAP: [KeyCode; 16] = [
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         eprintln!("Please specify a path.");
         std::process::exit(1);
@@ -48,18 +48,15 @@ async fn main() {
     let mut cpu = CPU::new(path.as_str());
     clear_background(BLACK);
 
-    let mut key: KeyCode = KeyCode::Key0;
-
     loop {
-        let temp_key = get_input(&mut cpu);
-        if let Some(k) = temp_key {
-            key = k;
+        for i in 0..16 {
+            if !is_key_down(KEYMAP[i]) {
+                cpu.keypad[i] = 0;
+                cpu.input_flag = false;
+            }
         }
 
-        if !is_key_down(key) && key != KeyCode::Key0 {
-            cpu.keypad[KEYMAP.iter().position(|k| k == &key).unwrap()] = 0; 
-            cpu.input_flag = false;
-        }
+        get_input(&mut cpu);
 
         cpu.cycle();
 
@@ -89,7 +86,7 @@ fn draw_screen(cpu: &CPU) {
     }
 }
 
-fn get_input(cpu: &mut CPU) -> Option<KeyCode> {
+fn get_input(cpu: &mut CPU) {
     if let Some(key) = get_last_key_pressed() {
         if KEYMAP.contains(&key) {
             let code = KEYMAP
@@ -99,9 +96,6 @@ fn get_input(cpu: &mut CPU) -> Option<KeyCode> {
             cpu.input_flag = true;
             cpu.last_key = code as u8;
             cpu.keypad[code] = 1;
-            return Some(key)
         }
     }
-
-    None
 }
