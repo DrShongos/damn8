@@ -1,7 +1,7 @@
 use macroquad::prelude::*;
 use std::env;
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -12,22 +12,22 @@ use cpu::CPU;
 const PIXEL_SIZE: f32 = 10.0;
 
 const KEYMAP: [KeyCode; 16] = [
-    KeyCode::X, // 0
+    KeyCode::X,    // 0
     KeyCode::Key1, // 1
     KeyCode::Key2, // 2
     KeyCode::Key3, // 3
-    KeyCode::Q, // 4
-    KeyCode::W, // 5
-    KeyCode::E, // 6
-    KeyCode::A, // 7
-    KeyCode::S, // 8
-    KeyCode::D, // 9
-    KeyCode::Z, // A
-    KeyCode::C, // B
+    KeyCode::Q,    // 4
+    KeyCode::W,    // 5
+    KeyCode::E,    // 6
+    KeyCode::A,    // 7
+    KeyCode::S,    // 8
+    KeyCode::D,    // 9
+    KeyCode::Z,    // A
+    KeyCode::C,    // B
     KeyCode::Key4, // C
-    KeyCode::R, // D
-    KeyCode::F, // E
-    KeyCode::V // F
+    KeyCode::R,    // D
+    KeyCode::F,    // E
+    KeyCode::V,    // F
 ];
 
 #[derive(Deserialize, Serialize)]
@@ -55,10 +55,22 @@ async fn main() {
     let path = &args[1];
 
     let config = load_config();
-    let color_off = Color::from_rgba(config.color_off.0, config.color_off.1, config.color_off.2, config.color_off.3);
-    let color_on = Color::from_rgba(config.color_on.0, config.color_on.1, config.color_on.2, config.color_on.3);
+    let color_off = Color::from_rgba(
+        config.color_off.0,
+        config.color_off.1,
+        config.color_off.2,
+        config.color_off.3,
+    );
+    let color_on = Color::from_rgba(
+        config.color_on.0,
+        config.color_on.1,
+        config.color_on.2,
+        config.color_on.3,
+    );
 
     let mut cpu = CPU::new(path.as_str());
+    CPU::initialize_os_table();
+
     clear_background(BLACK);
 
     loop {
@@ -119,21 +131,17 @@ fn load_config() -> Config {
 
     let file = fs::File::open(path).unwrap();
     let config: Config = ron::de::from_reader(file).unwrap();
-    
+
     config
 }
 
 fn get_input(cpu: &mut CPU) {
     if let Some(key) = get_last_key_pressed() {
         if KEYMAP.contains(&key) {
-            let code = KEYMAP
-                .iter()
-                .position(|k| k == &key)
-                .unwrap();
+            let code = KEYMAP.iter().position(|k| k == &key).unwrap();
             cpu.input_flag = true;
             cpu.last_key = code as u8;
             cpu.keypad[code] = 1;
         }
     }
 }
-
