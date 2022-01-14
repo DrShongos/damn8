@@ -1,20 +1,15 @@
 use macroquad::prelude::*;
 use std::env;
+use std::path::Path;
+use std::fs;
+
+use serde::{Deserialize, Serialize};
 
 mod cpu;
 
 use cpu::CPU;
 
 const PIXEL_SIZE: f32 = 10.0;
-
-fn window_conf() -> Conf {
-    Conf {
-        window_title: "Damn-8".to_string(),
-        window_width: 640,
-        window_height: 320,
-        ..Default::default()
-    }
-}
 
 const KEYMAP: [KeyCode; 16] = [
     KeyCode::X, // 0
@@ -35,6 +30,20 @@ const KEYMAP: [KeyCode; 16] = [
     KeyCode::V // F
 ];
 
+#[derive(Deserialize, Serialize)]
+struct Config {
+    color_on: (u8, u8, u8, u8),
+    color_off: (u8, u8, u8, u8),
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            color_on: (255, 255, 255, 255),
+            color_off: (0, 0, 0, 255),
+        }
+    }
+}
 
 #[macroquad::main(window_conf)]
 async fn main() {
@@ -44,6 +53,10 @@ async fn main() {
         std::process::exit(1);
     }
     let path = &args[1];
+
+    let config = load_config();
+    let color_off = Color::from_rgba(config.color_off.0, config.color_off.1, config.color_off.2, config.color_off.3);
+    let color_on = Color::from_rgba(config.color_on.0, config.color_on.1, config.color_on.2, config.color_on.3);
 
     let mut cpu = CPU::new(path.as_str());
     clear_background(BLACK);
@@ -61,15 +74,15 @@ async fn main() {
         cpu.cycle();
 
         if cpu.draw_flag {
-            draw_screen(&cpu);
+            draw_screen(&cpu, &color_off, &color_on);
         }
 
         next_frame().await
     }
 }
 
-fn draw_screen(cpu: &CPU) {
-    clear_background(BLACK);
+fn draw_screen(cpu: &CPU, color_off: &Color, color_on: &Color) {
+    clear_background(*color_off);
 
     for y in 0..32 {
         for x in 0..64 {
@@ -79,11 +92,35 @@ fn draw_screen(cpu: &CPU) {
                     y as f32 * PIXEL_SIZE,
                     PIXEL_SIZE,
                     PIXEL_SIZE,
-                    WHITE,
+                    *color_on,
                 );
             }
         }
     }
+}
+
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Damn-8".to_string(),
+        window_width: 640,
+        window_height: 320,
+        window_resizable: false,
+        ..Default::default()
+    }
+}
+
+fn load_config() -> Config {
+    let path = Path::new("config.ron");
+    if !path.exists() {
+        let config = Config::default();
+        fs::write(path, ron::to_string(&config).unwrap()).unwrap();
+        return config;
+    }
+
+    let file = fs::File::open(path).unwrap();
+    let config: Config = ron::de::from_reader(file).unwrap();
+    
+    config
 }
 
 fn get_input(cpu: &mut CPU) {
@@ -99,3 +136,4 @@ fn get_input(cpu: &mut CPU) {
         }
     }
 }
+

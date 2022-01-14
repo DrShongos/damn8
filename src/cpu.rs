@@ -30,9 +30,9 @@ pub struct CPU {
     rng: ThreadRng,
 
     // CHIP-8's registers. Even though there are 16 of them, only 0-E can be used by a program.
-    V: [u8; 16],
+    register: [u8; 16],
 
-    I: u16,
+    index_register: u16,
     pc: u16,
 
     pub gfx: [u8; 2048],
@@ -73,8 +73,8 @@ impl CPU {
             opcode: 0,
             memory: memory,
             rng: thread_rng(),
-            V: [0; 16],
-            I: 0,
+            register: [0; 16],
+            index_register: 0,
             pc: PROGRAM_START,
             gfx: [0; 2048],
             delay_timer: 0,
@@ -128,86 +128,86 @@ impl CPU {
                 self.pc = nnn;
             }
             0x3000 => {
-                if self.V[v_x] == (nn) as u8 {
+                if self.register[v_x] == (nn) as u8 {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
                 };
             }
             0x4000 => {
-                if self.V[v_x] != (nn) as u8 {
+                if self.register[v_x] != (nn) as u8 {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
                 };
             }
             0x5000 => {
-                if self.V[v_x] == self.V[v_y] {
+                if self.register[v_x] == self.register[v_y] {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
                 };
             }
             0x6000 => {
-                self.V[v_x] = (nn) as u8;
+                self.register[v_x] = (nn) as u8;
                 self.pc += 2;
             }
             0x7000 => {
-                self.V[v_x] = self.V[v_x].wrapping_add((nn) as u8);
+                self.register[v_x] = self.register[v_x].wrapping_add((nn) as u8);
                 self.pc += 2;
             }
             0x8000 => match n {
                 0x0000 => {
-                    self.V[v_x] = self.V[v_y];
+                    self.register[v_x] = self.register[v_y];
                     self.pc += 2;
                 }
                 0x0001 => {
-                    self.V[v_x] |= self.V[v_y];
+                    self.register[v_x] |= self.register[v_y];
                     self.pc += 2;
                 }
                 0x0002 => {
-                    self.V[v_x] &= self.V[v_y];
+                    self.register[v_x] &= self.register[v_y];
                     self.pc += 2;
                 }
                 0x0003 => {
-                    self.V[v_x] ^= self.V[v_y];
+                    self.register[v_x] ^= self.register[v_y];
                     self.pc += 2;
                 }
                 0x0004 => {
-                    if self.V[v_y] > (0xFF - self.V[v_x]) {
-                        self.V[0xF] = 1;
+                    if self.register[v_y] > (0xFF - self.register[v_x]) {
+                        self.register[0xF] = 1;
                     } else {
-                        self.V[0xF] = 0;
+                        self.register[0xF] = 0;
                     }
-                    self.V[v_x] = self.V[v_x].wrapping_add(self.V[v_y]);
+                    self.register[v_x] = self.register[v_x].wrapping_add(self.register[v_y]);
                     self.pc += 2;
                 }
                 0x0005 => {
-                    if self.V[v_y] > self.V[v_x] {
-                        self.V[0xF] = 0;
+                    if self.register[v_y] > self.register[v_x] {
+                        self.register[0xF] = 0;
                     } else {
-                        self.V[0xF] = 1;
+                        self.register[0xF] = 1;
                     }
-                    self.V[v_x] = self.V[v_x].wrapping_sub(self.V[v_y]);
+                    self.register[v_x] = self.register[v_x].wrapping_sub(self.register[v_y]);
                     self.pc += 2;
                 }
                 0x0006 => {
-                    self.V[0xF] = self.V[v_x] & 0x1;
-                    self.V[v_x] >>= 1;
+                    self.register[0xF] = self.register[v_x] & 0x1;
+                    self.register[v_x] >>= 1;
                     self.pc += 2;
                 }
                 0x0007 => {
-                    if self.V[v_y] > (0xFF - self.V[(self.opcode & 0x0F00) as usize]) {
-                        self.V[0xF] = 1;
+                    if self.register[v_y] > (0xFF - self.register[(self.opcode & 0x0F00) as usize]) {
+                        self.register[0xF] = 1;
                     } else {
-                        self.V[0xF] = 0;
+                        self.register[0xF] = 0;
                     }
-                    self.V[v_x] = self.V[v_y] - self.V[v_x];
+                    self.register[v_x] = self.register[v_y] - self.register[v_x];
                     self.pc += 2;
                 }
                 0x000E => {
-                    self.V[0xF] = self.V[v_x] & 7;
-                    self.V[v_x] <<= 1;
+                    self.register[0xF] = self.register[v_x] & 7;
+                    self.register[v_x] <<= 1;
                     self.pc += 2;
                 }
                 _ => {
@@ -215,32 +215,32 @@ impl CPU {
                 }
             },
             0x9000 => {
-                if self.V[v_x] != self.V[v_y] {
+                if self.register[v_x] != self.register[v_y] {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
                 };
             }
             0xA000 => {
-                self.I = nnn;
+                self.index_register = nnn;
                 self.pc += 2;
             }
             0xB000 => {
-                self.pc = (nnn) + self.V[0] as u16;
+                self.pc = (nnn) + self.register[0] as u16;
             }
             0xC000 => {
                 let number: u8 = self.rng.gen();
-                self.V[v_x] = number & nn as u8;
+                self.register[v_x] = number & nn as u8;
                 self.pc += 2;
             }
             0xD000 => {
-                let x = self.V[v_x] as u16;
-                let y = self.V[v_y] as u16;
+                let x = self.register[v_x] as u16;
+                let y = self.register[v_y] as u16;
                 let height = n;
 
-                self.V[0xf] = 0;
+                self.register[0xf] = 0;
                 for y_line in 0..height {
-                    let pixel = self.memory[(self.I + y_line) as usize] as u16;
+                    let pixel = self.memory[(self.index_register + y_line) as usize] as u16;
 
                     for x_line in 0..8 {
                         let x_pos = (x + x_line) % 64;
@@ -250,7 +250,7 @@ impl CPU {
 
                         if (pixel & (0x80 >> x_line)) != 0 {
                             if self.gfx[pixel_pos as usize] == 1 {
-                                self.V[0xf] = 1;
+                                self.register[0xf] = 1;
                             }
                             self.gfx[pixel_pos as usize] ^= 1;
                         }
@@ -262,14 +262,14 @@ impl CPU {
             }
             0xE000 => match nn {
                 0x009E => {
-                    if self.keypad[self.V[v_x] as usize] != 0 {
+                    if self.keypad[self.register[v_x] as usize] != 0 {
                         self.pc += 4;
                     } else {
                         self.pc += 2;
                     }
                 }
                 0x00A1 => {
-                    if self.keypad[self.V[v_x] as usize] == 0 {
+                    if self.keypad[self.register[v_x] as usize] == 0 {
                         self.pc += 4;
                     } else {
                         self.pc += 2;
@@ -281,7 +281,7 @@ impl CPU {
             }
             0xF000 => match nn {
                 0x0007 => {
-                    self.V[v_x] = self.delay_timer;
+                    self.register[v_x] = self.delay_timer;
                     self.pc += 2;
                 }
                 0x000A => {
@@ -290,39 +290,39 @@ impl CPU {
                     }
 
                     //println!("KEY PRESSED: {:#x}", self.last_key);
-                    self.V[v_x] = self.last_key;
+                    self.register[v_x] = self.last_key;
                     self.pc += 2;   
                 }
                 0x0015 => {
-                    self.delay_timer = self.V[v_x];
+                    self.delay_timer = self.register[v_x];
                     self.pc += 2;
                 }
                 0x0018 => {
-                    self.sound_timer = self.V[v_x];
+                    self.sound_timer = self.register[v_x];
                     self.pc += 2;
                 }
                 0x0029 => {
-                    self.I = self.V[v_x] as u16 * 0x5;
+                    self.index_register = self.register[v_x] as u16 * 0x5;
                     self.pc += 2;
                 }
                 0x0033 => {
-                    self.memory[self.I as usize] = self.V[v_x] / 100;
-                    self.memory[self.I as usize + 1] = (self.V[v_x] / 10) % 10;
-                    self.memory[self.I as usize + 2] = (self.V[v_x] % 100) % 10;
+                    self.memory[self.index_register as usize] = self.register[v_x] / 100;
+                    self.memory[self.index_register as usize + 1] = (self.register[v_x] / 10) % 10;
+                    self.memory[self.index_register as usize + 2] = (self.register[v_x] % 100) % 10;
                     self.pc += 2;
                 }
                 0x0055 => {
                     for offset in 0..v_x + 1 {
-                        self.memory[self.I as usize + offset] = self.V[offset];
+                        self.memory[self.index_register as usize + offset] = self.register[offset];
                     }
-                    self.I += ((self.opcode & 0x0F00) >> 8) + 1;
+                    self.index_register += ((self.opcode & 0x0F00) >> 8) + 1;
                     self.pc += 2;
                 }
                 0x0065 => {
                     for offset in 0..v_x + 1 {
-                        self.V[offset] = self.memory[self.I as usize + offset];
+                        self.register[offset] = self.memory[self.index_register as usize + offset];
                     }
-                    self.I += ((self.opcode & 0x0F00) >> 8) + 1;
+                    self.index_register += ((self.opcode & 0x0F00) >> 8) + 1;
                     self.pc += 2;
                 }
                 _ => {

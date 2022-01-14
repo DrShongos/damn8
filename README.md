@@ -6,8 +6,6 @@ To run, pass a path to a rom in the command line.
 TODO:
 - [ ] Use function pointers to handle opcodes instead of a large match statement.
 - [ ] Support multiple CHIP-8 implementations.
-- [ ] Add sound
-- [ ] Configurable keypad
-- [ ] Configurable colors
+- [x] Configurable colors
 - [x] Improve input handling
 - [x] Fix wrapping
