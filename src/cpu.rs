@@ -97,6 +97,7 @@ impl CPU {
     pub fn new(rom_path: &str) -> CPU {
         let mut memory = [0; 4096];
         let rom_data = fs::read(rom_path).unwrap();
+        println!("{}", rom_data.len());
 
         for i in 0..80 {
             memory[i] = FONTSET[i];
@@ -147,6 +148,8 @@ impl CPU {
         self.opcode = ((self.memory[self.pc as usize] as u16) << 8u16
             | self.memory[self.pc as usize + 1] as u16) as u16;
 
+        println!("{:#X}", self.opcode);
+
         OPCODE_TABLE[(self.opcode & 0xF000) as usize >> 12](self);
 
         if self.delay_timer > 0 {
@@ -182,7 +185,7 @@ impl CPU {
     fn call(&mut self) {
         self.stack[self.sp as usize] = self.pc;
         self.sp += 1;
-        self.pc = 0x0FFF;
+        self.pc = self.opcode & 0x0FFF;
     }
 
     fn if_equal(&mut self) {
